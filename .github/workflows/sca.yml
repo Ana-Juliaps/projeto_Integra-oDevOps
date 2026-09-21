@@ -1,0 +1,42 @@
+name: supply-chain-security
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"   # toda segunda, 06:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  sca-and-sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependências (respeita o lockfile)
+        run: npm ci
+
+      - name: SCA com npm audit (falha se houver high/critical)
+        run: npm audit --audit-level=high
+
+      - name: Gerar SBOM (CycloneDX)
+        if: always()
+        uses: anchore/sbom-action@v0
+        with:
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+
+      - name: Publicar SBOM como artefato
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cdx.json
